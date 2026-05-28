@@ -106,6 +106,14 @@ const IMGS={
   weight_balance:"img/weight_balance.jpg",
   emergency:"img/emergency.jpg",
   firma:"img/firma.png"
+}
+
+// ========= EMAIL CONFIG =========
+const EMAIL_CFG = {
+  publicKey:  localStorage.getItem('ejsPK')  || '',
+  serviceId:  localStorage.getItem('ejsSVC') || '',
+  templateId: localStorage.getItem('ejsTID') || '',
+  ccEmail:    'eforgan@gruppomodena.com'
 };
 if(EMAIL_CFG.publicKey){
   try{ emailjs.init({publicKey: EMAIL_CFG.publicKey}); }catch(e){}
@@ -579,12 +587,7 @@ function renderIntro(){
          <button class="btn" onclick="guestMode()" style="padding:12px 32px;font-size:15px">👤 Continuar como Invitado</button>`}
   </div>
   <div style="text-align:center;margin:0 0 24px">
-    <a href="manual.pdf" target="_blank"
-       style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--bg3);color:var(--text2);text-decoration:none;font-size:13px;transition:all .2s"
-       onmouseover="this.style.borderColor='#5a9bf0';this.style.color='#5a9bf0'"
-       onmouseout="this.style.borderColor='';this.style.color=''">
-      📖 Ver Manual Completo Bell 206B JetRanger III (PDF)
-    </a>
+    <a href="manual.pdf" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--bg3);color:var(--text2);text-decoration:none;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#5a9bf0';this.style.color='#5a9bf0'" onmouseout="this.style.borderColor='';this.style.color=''"> 📖 Ver Manual Completo Bell 206B JetRanger III (PDF)</a>
   </div>`;
 }
 
@@ -1260,10 +1263,10 @@ render();
 </script><button id="theme-btn" title="Modo diurno/nocturno">🌙</button>
 <script>
 (function(){
-  var btn=document.getElementById("theme-btn");
-  function apply(t){document.body.classList.toggle("day",t==="day");btn.textContent=t==="day"?"☀️":"🌙";}
-  apply(localStorage.getItem("theme")||"night");
-  btn.onclick=function(){var d=document.body.classList.contains("day");localStorage.setItem("theme",d?"night":"day");apply(d?"night":"day");};
+  var b=document.getElementById("theme-btn");
+  function a(t){document.body.classList.toggle("day",t==="day");b.textContent=t==="day"?"☀️":"🌙";}
+  a(localStorage.getItem("theme")||"night");
+  b.onclick=function(){var d=document.body.classList.contains("day");localStorage.setItem("theme",d?"night":"day");a(d?"night":"day");};
 })();
 </script>
 </body></html>
