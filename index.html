@@ -533,6 +533,9 @@ function render(){
   else if(state.view==='map') root.innerHTML=renderMap();
   else if(state.view==='finalExam') root.innerHTML=renderFinalExam();
   else if(state.view==='finalResult') root.innerHTML=renderFinalResult();
+  else if(state.view==='wb_calc') root.innerHTML=renderWBCalc();
+  else if(state.view==='perf_calc') root.innerHTML=renderPerfCalc();
+  else if(state.view==='hv_calc') root.innerHTML=renderHVCalc();
   if(state.adminOpen) showAdminPanel();
   saveState();
 }
@@ -587,7 +590,7 @@ function renderIntro(){
          <button class="btn" onclick="guestMode()" style="padding:12px 32px;font-size:15px">👤 Continuar como Invitado</button>`}
   </div>
   <div style="text-align:center;margin:0 0 24px">
-    <a href="manual.pdf" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--bg3);color:var(--text2);text-decoration:none;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#5a9bf0';this.style.color='#5a9bf0'" onmouseout="this.style.borderColor='';this.style.color=''"> 📖 Ver Manual Completo Bell 206B JetRanger III (PDF)</a>
+<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><a href="manual.pdf" target="_blank" download="Manual_Bell206B_JetRanger_III.pdf" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--bg3);color:var(--text2);text-decoration:none;font-size:13px">📥 Descargar Manual PDF (19 MB)</a><a href="https://docs.google.com/viewer?url=https://6xsim.github.io/bell206-curso/manual.pdf" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--bg3);color:var(--text2);text-decoration:none;font-size:13px">📖 Ver en Google Docs</a></div>
   </div>`;
 }
 
@@ -662,7 +665,9 @@ function renderMap(){
     <button class="btn btn-green" onclick="startFinal()">Rendir Examen Final ★</button>
   </div>`:`
   <div class="info-box" style="margin-top:8px"><p>Complete todos los módulos para acceder al Examen Final. Debe aprobar cada examen de módulo con mínimo 4/5 respuestas correctas para avanzar.</p></div>`}
-  `;
+  
+  <div style="margin-top:20px"><div class="tag" style="margin-bottom:8px">Herramientas de Cálculo</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><button class="btn" onclick="goWB()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">⚖️</span><span style="font-size:12px">Peso y Balanceo</span></button><button class="btn" onclick="goPerf()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📊</span><span style="font-size:12px">Performance</span></button><button class="btn" onclick="goHV()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📈</span><span style="font-size:12px">Diagrama H-V</span></button></div></div>
+`;
 }
 
 function renderModule(){
@@ -1268,5 +1273,340 @@ render();
   a(localStorage.getItem("theme")||"night");
   b.onclick=function(){var d=document.body.classList.contains("day");localStorage.setItem("theme",d?"night":"day");a(d?"night":"day");};
 })();
+</script>
+<script>
+// =========================================================
+// CALCULADORAS DE VUELO — Bell 206B JetRanger III
+// =========================================================
+const WB_STATIONS=[
+  {id:'empty',name:'Peso Vac\xedo Promedio',arm:116.5,w:1604,fixed:true},
+  {id:'oil',name:'Aceite (motor/transmisi\xf3n)',arm:179.0,w:12,fixed:true},
+  {id:'pilot',name:'Piloto (asiento derecho)',arm:65.0,w:0},
+  {id:'coplt',name:'Copiloto (asiento izquierdo)',arm:65.0,w:0},
+  {id:'pax1',name:'Pasajero trasero #1',arm:104.0,w:0},
+  {id:'pax2',name:'Pasajero trasero #2',arm:104.0,w:0},
+  {id:'pax3',name:'Pasajero trasero #3',arm:104.0,w:0},
+  {id:'bag',name:'Equipaje (m\xe1x. 250 lb / 113 kg)',arm:148.0,w:0,mx:250},
+  {id:'fuel',name:'Combustible Jet A @6.7 lb/gal',arm:110.7,w:0,mx:610}
+];
+const CG_FWD=[[1604,98],[2000,100],[2500,102],[3000,104],[3200,105]];
+const CG_AFT=113.0, GW_MAX=3200, GW_MIN=1604;
+function getFwdLim(gw){
+  if(gw<=CG_FWD[0][0])return CG_FWD[0][1];
+  if(gw>=CG_FWD[CG_FWD.length-1][0])return CG_FWD[CG_FWD.length-1][1];
+  for(var i=1;i<CG_FWD.length;i++){
+    if(gw<=CG_FWD[i][0]){var t=(gw-CG_FWD[i-1][0])/(CG_FWD[i][0]-CG_FWD[i-1][0]);return CG_FWD[i-1][1]+t*(CG_FWD[i][1]-CG_FWD[i-1][1]);}
+  }
+  return 105;
+}
+function renderWBCalc(){
+  var rows=WB_STATIONS.map(function(s){
+    var inp=s.fixed?'<span style="color:var(--amber2);font-weight:500">'+s.w+'</span>':'<input type="number" id="wb_'+s.id+'" value="'+s.w+'" min="0"'+(s.mx?' max="'+s.mx+'"':'')+' style="width:76px;padding:5px 6px;margin:0;font-size:13px" oninput="calcWB()">';
+    return '<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px;font-size:13px;color:var(--text2)">'+s.name+'</td><td style="padding:6px;font-size:12px;color:var(--text3);text-align:center">'+s.arm.toFixed(1)+'"</td><td style="padding:4px 6px;text-align:center">'+inp+'</td><td id="wb_m_'+s.id+'" style="padding:6px;font-size:12px;text-align:right;color:var(--text3)">'+(s.w*s.arm).toFixed(0)+'</td></tr>';
+  }).join('');
+  return '<div class="flex-between" style="margin-bottom:14px"><button class="btn btn-sm" onclick="goMap()">← Volver</button><span class="badge badge-amber">\u2696\ufe0f Peso y Balanceo</span></div>'
+  +'<div class="card" style="margin-bottom:10px;overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border2)"><th style="padding:6px 8px;font-size:11px;color:var(--text3);text-align:left;font-weight:500">\xccdTEM</th><th style="padding:6px;font-size:11px;color:var(--text3);text-align:center;font-weight:500">BRAZO (in)</th><th style="padding:6px;font-size:11px;color:var(--text3);text-align:center;font-weight:500">PESO (lb)</th><th style="padding:6px;font-size:11px;color:var(--text3);text-align:right;font-weight:500">MOMENTO</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr style="border-top:2px solid var(--border2);background:var(--bg3)"><td colspan="2" style="padding:8px;font-size:13px;font-weight:500">TOTALES</td><td id="wb_tw" style="padding:8px;font-size:14px;font-weight:500;text-align:center;color:var(--amber2)">\u2014</td><td id="wb_tm" style="padding:8px;font-size:14px;font-weight:500;text-align:right;color:var(--amber2)">\u2014</td></tr></tfoot></table></div>'
+  +'<div id="wb_res" class="card" style="margin-bottom:10px"><p style="color:var(--text3)">Ingrese los pesos para calcular</p></div>'
+  +'<canvas id="wb_cv" width="560" height="310" style="width:100%;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--border)"></canvas>'
+  +'<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px">Envolvente aproximada \u2014 Verificar siempre con el Manual de Vuelo y el Formulario de Peso y Balance de la aeronave espec\xedfica</p>';
+}
+window.calcWB=function(){
+  var tw=0,tm=0;
+  WB_STATIONS.forEach(function(s){
+    var el=document.getElementById('wb_'+s.id);
+    var w=s.fixed?s.w:(el?parseFloat(el.value)||0:0);
+    var mo=w*s.arm; tw+=w; tm+=mo;
+    var mel=document.getElementById('wb_m_'+s.id);
+    if(mel)mel.textContent=mo.toFixed(0);
+  });
+  var wEl=document.getElementById('wb_tw'),mEl=document.getElementById('wb_tm');
+  if(wEl)wEl.textContent=tw.toFixed(0)+' lb';
+  if(mEl)mEl.textContent=tm.toFixed(0);
+  var cg=tw>0?tm/tw:0;
+  var fl=getFwdLim(tw);
+  var ok=tw<=GW_MAX&&tw>=GW_MIN&&cg>=fl&&cg<=CG_AFT;
+  var over=tw>GW_MAX;
+  var kg=(tw*0.4536).toFixed(0);
+  var cgM=(cg*0.0254).toFixed(3);
+  var status=over?'\u274c EXCEDE PESO M\xc1XIMO':!ok?'\u274c CG FUERA DE L\xceMITES':'\u2705 DENTRO DE L\xceMITES';
+  var col=ok&&!over?'var(--green)':'var(--red)';
+  var r=document.getElementById('wb_res');
+  if(r)r.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Peso Bruto</div><div style="font-size:22px;font-weight:500;color:var(--amber2)">'+tw.toFixed(0)+'<span style="font-size:12px"> lb</span></div><div style="font-size:12px;color:var(--text3)">('+kg+' kg)</div></div><div><div style="font-size:11px;color:var(--text3);text-transform:uppercase">CG Calculado</div><div style="font-size:22px;font-weight:500;color:var(--amber2)">'+cg.toFixed(2)+'<span style="font-size:12px"> in</span></div><div style="font-size:12px;color:var(--text3)">('+cgM+' m)</div></div><div><div style="font-size:11px;color:var(--text3);text-transform:uppercase">Estado</div><div style="font-size:15px;font-weight:500;color:'+col+';margin-top:4px">'+status+'</div><div style="font-size:12px;color:var(--text3)">L\xedm: '+fl.toFixed(1)+'" \u2014 '+CG_AFT+'"</div></div></div>';
+  setTimeout(function(){drawWBCanvas(tw,cg);},10);
+};
+function drawWBCanvas(gw,cg){
+  var c=document.getElementById('wb_cv');if(!c)return;
+  var ctx=c.getContext('2d'),W=c.width,H=c.height;
+  var pl=60,pr=20,pt=28,pb=48,cW=W-pl-pr,cH=H-pt-pb;
+  var cMin=96,cMax=116,gMin=1300,gMax=3400;
+  var tx=function(v){return pl+(v-cMin)/(cMax-cMin)*cW;};
+  var ty=function(v){return pt+(1-(v-gMin)/(gMax-gMin))*cH;};
+  ctx.fillStyle='#161b24';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(100,120,150,0.2)';ctx.lineWidth=0.5;
+  for(var gc=97;gc<=115;gc+=2){ctx.beginPath();ctx.moveTo(tx(gc),pt);ctx.lineTo(tx(gc),pt+cH);ctx.stroke();}
+  for(var gr=1400;gr<=3400;gr+=200){ctx.beginPath();ctx.moveTo(pl,ty(gr));ctx.lineTo(pl+cW,ty(gr));ctx.stroke();}
+  // Envelope fill
+  ctx.beginPath();ctx.moveTo(tx(getFwdLim(GW_MIN)),ty(GW_MIN));
+  for(var w=GW_MIN;w<=GW_MAX;w+=25)ctx.lineTo(tx(getFwdLim(w)),ty(w));
+  ctx.lineTo(tx(CG_AFT),ty(GW_MAX));ctx.lineTo(tx(CG_AFT),ty(GW_MIN));ctx.closePath();
+  ctx.fillStyle='rgba(46,204,113,0.1)';ctx.fill();
+  ctx.strokeStyle='rgba(46,204,113,0.55)';ctx.lineWidth=2;ctx.stroke();
+  // Max GW line
+  ctx.strokeStyle='rgba(232,160,32,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pl,ty(GW_MAX));ctx.lineTo(pl+cW,ty(GW_MAX));ctx.stroke();ctx.setLineDash([]);
+  // Axes
+  ctx.strokeStyle='rgba(150,170,200,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pl,pt);ctx.lineTo(pl,pt+cH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(pl,pt+cH);ctx.lineTo(pl+cW,pt+cH);ctx.stroke();
+  // Labels
+  ctx.fillStyle='rgba(130,150,180,0.7)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  for(var gc2=98;gc2<=114;gc2+=2)ctx.fillText(gc2,tx(gc2),pt+cH+14);
+  ctx.textAlign='right';
+  for(var gr2=1400;gr2<=3200;gr2+=200)ctx.fillText(gr2,pl-4,ty(gr2)+3);
+  ctx.fillStyle='rgba(170,185,210,0.7)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('CG (pulgadas desde datum / nariz)',pl+cW/2,H-6);
+  ctx.save();ctx.translate(13,pt+cH/2);ctx.rotate(-Math.PI/2);ctx.fillText('Peso Bruto (lb)',0,0);ctx.restore();
+  ctx.fillStyle='rgba(232,160,32,0.6)';ctx.font='9px sans-serif';ctx.textAlign='left';
+  ctx.fillText('M\xe1x '+GW_MAX+' lb',pl+3,ty(GW_MAX)-4);
+  // Point
+  if(gw>=GW_MIN&&cg>90&&cg<120){
+    var px=tx(cg),py=ty(gw),inOk=gw<=GW_MAX&&gw>=GW_MIN&&cg>=getFwdLim(gw)&&cg<=CG_AFT;
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.setLineDash([3,5]);
+    ctx.beginPath();ctx.moveTo(px,pt);ctx.lineTo(px,pt+cH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pl,py);ctx.lineTo(pl+cW,py);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(px,py,9,0,Math.PI*2);
+    ctx.fillStyle=inOk?'rgba(46,204,113,0.9)':'rgba(231,76,60,0.9)';ctx.fill();
+    ctx.strokeStyle='white';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='white';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+    var lx=px+12,ly=py-5;if(lx+55>W-pr)lx=px-65;
+    ctx.fillText(gw.toFixed(0)+' lb',lx,ly);ctx.fillText(cg.toFixed(2)+'"',lx,ly+13);
+  }
+}
+
+function getISA(pa){return 15-0.00198*pa;}
+function calcPV(pa,oat,gw,ai){
+  var isa=getISA(pa),dT=oat-isa;
+  var rc=Math.max(0,2400-0.1*pa-0.5*dT-0.3*(gw-2000));
+  if(ai)rc=Math.max(0,rc-240);
+  var da=pa+118.8*dT;
+  var ic=Math.min(3200,Math.max(0,3200-8*(da/1000)-8*dT-(ai?220:0)));
+  var iw=Math.min(3200,Math.max(0,ic*0.927));
+  var oc=Math.min(3200,Math.max(0,2900-14*(da/1000)-12*dT-(ai?295:0)));
+  var ow=Math.min(3200,Math.max(0,oc*0.908));
+  return{rc:rc,da:da,ic:ic,iw:iw,oc:oc,ow:ow,isa:isa,dT:dT};
+}
+function renderPerfCalc(){
+  return '<div class="flex-between" style="margin-bottom:14px"><button class="btn btn-sm" onclick="goMap()">← Volver</button><span class="badge badge-amber">\ud83d\udcca Performance</span></div>'
+  +'<div class="card" style="margin-bottom:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+  +'<div><label>Presi\xf3n Altitud (pies)</label><input type="number" id="pf_pa" value="5000" min="0" max="20000" step="500" oninput="calcPerf()"></div>'
+  +'<div><label>OAT — Temperatura (°C)</label><input type="number" id="pf_oat" value="15" min="-50" max="55" oninput="calcPerf()"></div>'
+  +'<div><label>Peso Bruto (lb) — M\xe1x. 3,200</label><input type="number" id="pf_gw" value="2800" min="1604" max="3200" step="50" oninput="calcPerf()"></div>'
+  +'<div><label>Anti-hielo</label><select id="pf_ai" onchange="calcPerf()" style="background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--radius);padding:10px;color:var(--text);width:100%;font-size:14px"><option value="0">OFF</option><option value="1">ON</option></select></div>'
+  +'</div></div>'
+  +'<div id="pf_res" class="card" style="margin-bottom:10px"><p style="color:var(--text3)">Complete los datos</p></div>'
+  +'<canvas id="pf_rc" width="560" height="240" style="width:100%;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--border);margin-bottom:8px"></canvas>'
+  +'<canvas id="pf_hv" width="560" height="180" style="width:100%;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--border)"></canvas>'
+  +'<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px">Datos aproximados basados en Figuras 12-1, 12-2, 12-4, 12-5 — Bell 206BIII P/G SPN 10/98. Verificar siempre con el Manual de Vuelo.</p>';
+}
+window.calcPerf=function(){
+  var pa=parseFloat(document.getElementById('pf_pa').value)||0;
+  var oat=parseFloat(document.getElementById('pf_oat').value)||15;
+  var gw=parseFloat(document.getElementById('pf_gw').value)||2800;
+  var ai=parseInt(document.getElementById('pf_ai').value)||0;
+  var p=calcPV(pa,oat,gw,ai===1);
+  var ci=gw<=p.ic,co=gw<=p.oc;
+  var r=document.getElementById('pf_res');
+  if(r)r.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">'
+    +'<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Raz\xf3n Ascenso</div><div style="font-size:22px;font-weight:500;color:var(--amber2)">'+p.rc.toFixed(0)+'</div><div style="font-size:11px;color:var(--text3)">ft/min ('+((p.rc*0.00508).toFixed(2))+' m/s)</div></div>'
+    +'<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Alt. Densidad</div><div style="font-size:22px;font-weight:500;color:var(--amber2)">'+p.da.toFixed(0)+'</div><div style="font-size:11px;color:var(--text3)">ft ('+((p.da*0.3048).toFixed(0))+' m)</div></div>'
+    +'<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Techo VS IGE</div><div style="font-size:20px;font-weight:500;color:'+(ci?'var(--green)':'var(--red)')+'">'+p.ic.toFixed(0)+'</div><div style="font-size:11px;color:var(--text3)">lb calm \u2014 '+(ci?'\u2705 OK':'\u274c NO')+'</div></div>'
+    +'<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Techo VS OGE</div><div style="font-size:20px;font-weight:500;color:'+(co?'var(--green)':'var(--red)')+'">'+p.oc.toFixed(0)+'</div><div style="font-size:11px;color:var(--text3)">lb calm \u2014 '+(co?'\u2705 OK':'\u274c NO')+'</div></div>'
+    +'</div>';
+  setTimeout(function(){drawRCCanvas(pa,oat,gw,ai===1,p);drawHovCanvas(gw,p);},10);
+};
+function drawRCCanvas(pa,oat,gw,ai,p){
+  var c=document.getElementById('pf_rc');if(!c)return;
+  var ctx=c.getContext('2d'),W=c.width,H=c.height;
+  var pl=58,pr=20,pt=28,pb=44,cW=W-pl-pr,cH=H-pt-pb;
+  ctx.fillStyle='#161b24';ctx.fillRect(0,0,W,H);
+  var aMax=20000,rMax=2800;
+  var tx=function(a){return pl+a/aMax*cW;};var ty=function(r){return pt+(1-r/rMax)*cH;};
+  ctx.strokeStyle='rgba(100,120,150,0.2)';ctx.lineWidth=0.5;
+  for(var a=0;a<=20000;a+=2000){ctx.beginPath();ctx.moveTo(tx(a),pt);ctx.lineTo(tx(a),pt+cH);ctx.stroke();}
+  for(var r=0;r<=2800;r+=400){ctx.beginPath();ctx.moveTo(pl,ty(r));ctx.lineTo(pl+cW,ty(r));ctx.stroke();}
+  var weights=[2000,2400,2800,3200];
+  var colors=['rgba(46,204,113,0.8)','rgba(52,152,219,0.8)','rgba(232,160,32,0.9)','rgba(231,76,60,0.8)'];
+  weights.forEach(function(w,i){
+    ctx.strokeStyle=colors[i];ctx.lineWidth=w===gw?3:1.5;ctx.beginPath();var first=true;
+    for(var alt=0;alt<=20000;alt+=500){var rc=calcPV(alt,oat,w,ai).rc;if(first){ctx.moveTo(tx(alt),ty(rc));first=false;}else ctx.lineTo(tx(alt),ty(rc));}
+    ctx.stroke();
+    var re=calcPV(19500,oat,w,ai).rc;if(re>0){ctx.fillStyle=colors[i];ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(w+' lb',tx(19500)-5,ty(re)-4);}
+  });
+  ctx.beginPath();ctx.arc(tx(pa),ty(p.rc),7,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();ctx.strokeStyle='rgba(232,160,32,0.9)';ctx.lineWidth=2;ctx.stroke();
+  ctx.strokeStyle='rgba(150,170,200,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pl,pt);ctx.lineTo(pl,pt+cH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(pl,pt+cH);ctx.lineTo(pl+cW,pt+cH);ctx.stroke();
+  ctx.fillStyle='rgba(130,150,180,0.7)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  for(var a2=0;a2<=20000;a2+=4000)ctx.fillText(a2/1000+'k',tx(a2),pt+cH+14);
+  ctx.textAlign='right';
+  for(var r2=0;r2<=2800;r2+=400)ctx.fillText(r2,pl-4,ty(r2)+3);
+  ctx.fillStyle='rgba(170,185,210,0.7)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Presi\xf3n Altitud (miles de pies)',pl+cW/2,H-6);
+  ctx.save();ctx.translate(13,pt+cH/2);ctx.rotate(-Math.PI/2);ctx.fillText('Raz\xf3n Ascenso (ft/min)',0,0);ctx.restore();
+  ctx.fillStyle='rgba(232,160,32,0.7)';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('R\xe9gimen de Ascenso — OAT='+oat+'\xb0C Anti-hielo '+(ai?'ON':'OFF'),pl+cW/2,pt-10);
+}
+function drawHovCanvas(gw,p){
+  var c=document.getElementById('pf_hv');if(!c)return;
+  var ctx=c.getContext('2d'),W=c.width,H=c.height;
+  var pl=90,pr=20,pt=30,pb=35,cW=W-pl-pr,cH=H-pt-pb;
+  ctx.fillStyle='#161b24';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(170,185,210,0.7)';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Techo de Vuelo Estacionario — M\xe1ximo Peso Bruto Permisible (lb)',pl+cW/2,pt-10);
+  var bars=[
+    {lbl:'IGE Calmado',v:p.ic,col:'rgba(46,204,113,0.8)',ok:gw<=p.ic},
+    {lbl:'IGE Viento',v:p.iw,col:'rgba(52,152,219,0.8)',ok:gw<=p.iw},
+    {lbl:'OGE Calmado',v:p.oc,col:'rgba(232,160,32,0.8)',ok:gw<=p.oc},
+    {lbl:'OGE Viento',v:p.ow,col:'rgba(231,76,60,0.75)',ok:gw<=p.ow}
+  ];
+  var bH=cH/bars.length-5;
+  bars.forEach(function(b,i){
+    var y=pt+i*(bH+5);
+    var bW=Math.min(cW,b.v/3200*cW);var gwW=Math.min(cW,gw/3200*cW);
+    ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(pl,y,cW,bH);
+    ctx.fillStyle=b.col;ctx.fillRect(pl,y,bW,bH);
+    ctx.fillStyle='rgba(160,175,200,0.85)';ctx.font='11px sans-serif';ctx.textAlign='right';
+    ctx.fillText(b.lbl,pl-5,y+bH/2+4);
+    ctx.fillStyle=b.ok?'rgba(46,204,113,0.9)':'rgba(231,76,60,0.9)';
+    ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+    ctx.fillText(b.v.toFixed(0)+' lb '+(b.ok?'\u2713':'\u2717'),pl+bW+4,y+bH/2+4);
+    ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(pl+gwW,y);ctx.lineTo(pl+gwW,y+bH);ctx.stroke();ctx.setLineDash([]);
+  });
+  ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  var gwW=Math.min(cW,gw/3200*cW);
+  ctx.fillText('PB: '+gw+' lb',pl+gwW,H-3);
+  ctx.fillStyle='rgba(130,150,180,0.6)';ctx.font='9px sans-serif';ctx.textAlign='center';
+  [1000,1500,2000,2500,3000,3200].forEach(function(v){ctx.fillText(v,pl+v/3200*cW,pt+cH+14);});
+}
+
+// H-V DIAGRAM
+var HV_UP=[[0,350],[5,350],[10,345],[15,338],[20,320],[25,298],[30,268],[35,228],[40,186],[45,144],[50,108],[52,100]];
+function isAvoid(spd,ht){
+  if(ht>=100&&ht<=400){
+    for(var i=1;i<HV_UP.length;i++){if(spd<=HV_UP[i][0]){var t=(spd-HV_UP[i-1][0])/(HV_UP[i][0]-HV_UP[i-1][0]);var hb=HV_UP[i-1][1]+t*(HV_UP[i][1]-HV_UP[i-1][1]);if(ht<=hb)return true;break;}}
+  }
+  if(ht<=20&&spd>=17&&spd<=65)return true;
+  return false;
+}
+function renderHVCalc(){
+  return '<div class="flex-between" style="margin-bottom:14px"><button class="btn btn-sm" onclick="goMap()">← Volver</button><span class="badge badge-amber">\ud83d\udcc8 Diagrama H-V</span></div>'
+  +'<h3 style="margin-bottom:6px">Diagrama Altura-Velocidad (H-V)</h3>'
+  +'<p style="font-size:13px;margin-bottom:10px">Define las condiciones desde las cuales se puede realizar un aterrizaje seguro en superficie plana y firme tras falla del motor. <strong style="color:var(--red)">EVITAR OPERAR EN LA ZONA SOMBREADA.</strong></p>'
+  +'<div class="card" style="margin-bottom:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+  +'<div><label>Velocidad A\xe9rea (KIAS)</label><input type="number" id="hv_s" value="60" min="0" max="130" step="1" oninput="updHV()"></div>'
+  +'<div><label>Altura sobre terreno (ft AGL)</label><input type="number" id="hv_h" value="500" min="0" max="500" step="10" oninput="updHV()"></div>'
+  +'</div><div id="hv_st" style="margin-top:10px;padding:10px;border-radius:var(--radius);background:var(--bg3);text-align:center;font-size:14px;font-weight:500">Ingrese datos de vuelo</div></div>'
+  +'<canvas id="hv_cv" width="560" height="400" style="width:100%;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--border)"></canvas>'
+  +'<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px">Figura 12-6 Bell 206B JetRanger III \u2014 Superficies lisas, niveladas y firmes \u2014 No exceder l\xedmites de altitud vs. peso bruto</p>';
+}
+window.updHV=function(){
+  var spd=parseFloat(document.getElementById('hv_s').value)||0;
+  var ht=parseFloat(document.getElementById('hv_h').value)||0;
+  var avoid=isAvoid(spd,ht);
+  var st=document.getElementById('hv_st');
+  if(st){st.textContent=avoid?'\u274c ZONA A EVITAR \u2014 Aterrizaje seguro NO garantizado':'\u2705 ZONA SEGURA \u2014 Aterrizaje de emergencia factible';st.style.color=avoid?'var(--red)':'var(--green)';st.style.background=avoid?'rgba(231,76,60,0.15)':'rgba(46,204,113,0.1)';}
+  setTimeout(function(){drawHV(spd,ht);},10);
+};
+function drawHV(spd,ht){
+  var c=document.getElementById('hv_cv');if(!c)return;
+  var ctx=c.getContext('2d'),W=c.width,H=c.height;
+  var dv=W*0.52;
+  // Large scale panel (left): 100-400 ft
+  var L={l:55,r:8,t:38,b:46};var LcW=dv-L.l-L.r,LcH=H-L.t-L.b;
+  var LsMax=65,LhMin=100,LhMax=400;
+  var txL=function(s){return L.l+s/LsMax*LcW;};var tyL=function(h){return L.t+(1-(h-LhMin)/(LhMax-LhMin))*LcH;};
+  // Small scale panel (right): 0-100 ft
+  var R={l:8,r:18,t:38,b:46};var RcW=W-dv-R.l-R.r,RcH=H-R.t-R.b;
+  var RsMax=65,RhMax=100;
+  var txR=function(s){return dv+R.l+s/RsMax*RcW;};var tyR=function(h){return R.t+(1-h/RhMax)*RcH;};
+
+  ctx.fillStyle='#161b24';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(80,100,130,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(dv,0);ctx.lineTo(dv,H);ctx.stroke();ctx.setLineDash([]);
+
+  // Grid L
+  ctx.strokeStyle='rgba(100,120,150,0.18)';ctx.lineWidth=0.5;
+  [0,10,20,30,40,52,60].forEach(function(s){ctx.beginPath();ctx.moveTo(txL(s),L.t);ctx.lineTo(txL(s),L.t+LcH);ctx.stroke();});
+  [100,150,200,250,300,350,400].forEach(function(h){ctx.beginPath();ctx.moveTo(L.l,tyL(h));ctx.lineTo(L.l+LcW,tyL(h));ctx.stroke();});
+  // Grid R
+  [0,10,20,30,40,52,60].forEach(function(s){ctx.beginPath();ctx.moveTo(txR(s),R.t);ctx.lineTo(txR(s),R.t+RcH);ctx.stroke();});
+  [0,20,40,60,80,100].forEach(function(h){ctx.beginPath();ctx.moveTo(dv+R.l,tyR(h));ctx.lineTo(dv+R.l+RcW,tyR(h));ctx.stroke();});
+
+  // Avoid zone LARGE
+  ctx.beginPath();ctx.moveTo(txL(0),tyL(LhMax));
+  HV_UP.forEach(function(pt){ctx.lineTo(txL(pt[0]),tyL(Math.min(LhMax,Math.max(LhMin,pt[1]))));});
+  ctx.lineTo(txL(0),tyL(LhMin));ctx.closePath();
+  ctx.fillStyle='rgba(231,76,60,0.22)';ctx.fill();
+  ctx.strokeStyle='rgba(231,76,60,0.65)';ctx.lineWidth=2;ctx.beginPath();
+  var fst=true;HV_UP.forEach(function(pt){var h=Math.min(LhMax,Math.max(LhMin,pt[1]));if(fst){ctx.moveTo(txL(pt[0]),tyL(h));fst=false;}else ctx.lineTo(txL(pt[0]),tyL(h));});ctx.stroke();
+  ctx.fillStyle='rgba(231,76,60,0.65)';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillText('ZONA A EVITAR',txL(22),tyL(300));
+  ctx.fillStyle='rgba(46,204,113,0.55)';ctx.fillText('SEGURO',txL(50),tyL(150));
+
+  // Avoid zone SMALL (upper + lower)
+  // Upper part (from HV curve, below 100ft)
+  ctx.beginPath();ctx.moveTo(txR(0),tyR(RhMax));
+  HV_UP.forEach(function(pt){if(pt[1]<=RhMax)ctx.lineTo(txR(pt[0]),tyR(pt[1]));});
+  ctx.lineTo(txR(0),tyR(0));ctx.closePath();
+  ctx.fillStyle='rgba(231,76,60,0.22)';ctx.fill();
+  // Lower rectangle
+  ctx.beginPath();ctx.moveTo(txR(17),tyR(0));ctx.lineTo(txR(17),tyR(20));ctx.lineTo(txR(65),tyR(20));ctx.lineTo(txR(65),tyR(0));ctx.closePath();
+  ctx.fillStyle='rgba(231,76,60,0.22)';ctx.fill();ctx.strokeStyle='rgba(231,76,60,0.65)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='rgba(46,204,113,0.55)';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('SEGURO',txR(50),tyR(60));
+
+  // Axes
+  ctx.strokeStyle='rgba(150,170,200,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(L.l,L.t);ctx.lineTo(L.l,L.t+LcH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(L.l,L.t+LcH);ctx.lineTo(L.l+LcW,L.t+LcH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(dv+R.l,R.t);ctx.lineTo(dv+R.l,R.t+RcH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(dv+R.l,R.t+RcH);ctx.lineTo(dv+R.l+RcW,R.t+RcH);ctx.stroke();
+
+  // Labels L
+  ctx.fillStyle='rgba(130,150,180,0.7)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  [0,10,20,30,40,52,60].forEach(function(s){ctx.fillText(s,txL(s),L.t+LcH+14);});
+  ctx.textAlign='right';
+  [100,150,200,250,300,350,400].forEach(function(h){ctx.fillText(h,L.l-4,tyL(h)+3);});
+  ctx.fillStyle='rgba(170,185,210,0.75)';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('ESCALA GRANDE \u2014 100-400 ft',L.l+LcW/2,18);
+  ctx.fillText('Velocidad A\xe9rea Indicada (KIAS)',L.l+LcW/2,H-6);
+  ctx.save();ctx.translate(13,L.t+LcH/2);ctx.rotate(-Math.PI/2);ctx.fillText('Altura sobre terreno (ft AGL)',0,0);ctx.restore();
+
+  // Labels R
+  ctx.fillStyle='rgba(130,150,180,0.7)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  [0,20,40,52,60].forEach(function(s){ctx.fillText(s,txR(s),R.t+RcH+14);});
+  ctx.textAlign='left';
+  [0,20,40,60,80,100].forEach(function(h){ctx.fillText(h,dv+R.l+3,tyR(h)+3);});
+  ctx.fillStyle='rgba(170,185,210,0.75)';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('ESCALA PEQUE\xd1A \u2014 0-100 ft',dv+R.l+RcW/2,18);
+  ctx.fillText('KIAS',dv+R.l+RcW/2,H-6);
+
+  // Current point
+  function plotPt(px,py,danger){
+    ctx.beginPath();ctx.arc(px,py,8,0,Math.PI*2);
+    ctx.fillStyle=danger?'rgba(231,76,60,0.9)':'rgba(46,204,113,0.9)';ctx.fill();
+    ctx.strokeStyle='white';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='white';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+    ctx.fillText(spd+' kt',px+10,py-3);ctx.fillText(ht+' ft',px+10,py+9);
+  }
+  var av=isAvoid(spd,ht);
+  if(ht>=LhMin&&ht<=LhMax)plotPt(txL(Math.min(LsMax,spd)),tyL(ht),av);
+  if(ht>=0&&ht<=RhMax)plotPt(txR(Math.min(RsMax,spd)),tyR(ht),av);
+}
+
+window.goWB=function(){state.view='wb_calc';render();setTimeout(function(){window.calcWB();},50);};
+window.goPerf=function(){state.view='perf_calc';render();setTimeout(function(){window.calcPerf();},50);};
+window.goHV=function(){state.view='hv_calc';render();setTimeout(function(){window.updHV();},50);};
+
 </script>
 </body></html>
