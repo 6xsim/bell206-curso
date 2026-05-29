@@ -521,6 +521,21 @@ function saveState(){
 loadState();
 
 // ========= RENDER =========
+function getCertBanner(){
+  var correct=state.finalAnswers.filter(function(a,i){return a===FINAL_EXAM[i].ans;}).length;
+  if(!state.finalReviewed||correct<21) return "";
+  var pct=Math.round(correct/30*100);
+  var certBtn=state.user
+    ?'<button class="btn btn-primary" onclick="downloadCertNow('+correct+','+pct+')" style="font-size:13px;padding:8px 16px">📄 Descargar Certificado PDF</button>'
+    :'';
+  return '<div style="background:linear-gradient(135deg,#1e3a1e,#0a2a0a);border:1.5px solid var(--green);border-radius:var(--radius2);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+    +'<div><div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.08em">🏆 Curso Aprobado</div>'
+    +'<div style="font-size:14px;font-weight:500;color:#fff;margin-top:2px">'+correct+'/30 ('+pct+'%) — ✅ FASE TEÓRICA COMPLETADA</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="btn btn-green" onclick="goFinalResult()" style="font-size:13px;padding:8px 16px">🏆 Ver Resultado</button>'
+    +certBtn
+    +'</div></div>';
+}
 function render(){
   const root=document.getElementById('root');
   if(state.view==='intro') root.innerHTML=renderIntro();
@@ -664,20 +679,7 @@ function renderMap(){
   </div>`:`
   <div class="info-box" style="margin-top:8px"><p>Complete todos los módulos para acceder al Examen Final. Debe aprobar cada examen de módulo con mínimo 4/5 respuestas correctas para avanzar.</p></div>`}
   
-  \${(function(){
-    var correct=state.finalAnswers.filter(function(a,i){return a===FINAL_EXAM[i].ans;}).length;
-    var passed=state.finalReviewed&&correct>=21;
-    if(!passed) return "";
-    var pct=Math.round(correct/30*100);
-    return '<div style="background:linear-gradient(135deg,#1e3a1e,#0a2a0a);border:1.5px solid var(--green);border-radius:var(--radius2);padding:16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
-      +'<div><div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.08em">Curso Aprobado</div>'
-      +'<div style="font-size:15px;font-weight:500;color:#fff;margin-top:2px">'+correct+'/30 ('+pct+'%) — ✅ FASE TEÓRICA COMPLETADA</div></div>'
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      +'<button class="btn btn-green" onclick="goFinalResult()" style="font-size:13px;padding:8px 16px">🏆 Ver Resultado Final</button>'
-      +(state.user?'<button class="btn btn-primary" onclick="downloadCertNow()' + correct + ',' + pct + ')" style="font-size:13px;padding:8px 16px">📄 Descargar Certificado PDF</button>':'')
-      +'</div></div>';
-  })()\}
-  <div style="margin-top:20px"><div class="tag" style="margin-bottom:8px">Herramientas de Cálculo</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><button class="btn" onclick="goWB()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">⚖️</span><span style="font-size:12px">Peso y Balanceo</span></button><button class="btn" onclick="goPerf()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📊</span><span style="font-size:12px">Performance</span></button><button class="btn" onclick="goHV()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📈</span><span style="font-size:12px">Diagrama H-V</span></button></div></div>
+    <div style="margin-top:20px"><div class="tag" style="margin-bottom:8px">Herramientas de Cálculo</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><button class="btn" onclick="goWB()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">⚖️</span><span style="font-size:12px">Peso y Balanceo</span></button><button class="btn" onclick="goPerf()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📊</span><span style="font-size:12px">Performance</span></button><button class="btn" onclick="goHV()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📈</span><span style="font-size:12px">Diagrama H-V</span></button></div></div>
 `;
 }
 
