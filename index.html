@@ -1125,9 +1125,29 @@ async function sendCertificateEmails(doc, safeName, score, pct){
   if(!statusEl) return;
 
   if(!EMAIL_CFG.publicKey || !EMAIL_CFG.serviceId || !EMAIL_CFG.templateId){
-    statusEl.className='email-status error';
-    statusEl.innerHTML='⚠ Email no configurado. Configure EmailJS en el Panel Administrador para enviar emails automáticos.';
-    statusEl.style.display='block';
+    // Fallback: open mailto links
+    var subj = encodeURIComponent('Aprobaci\u00f3n Curso Bell 206B JetRanger III \u2014 ' + state.user.nombre + ' ' + state.user.apellido);
+    var body = encodeURIComponent('Estimado/a ' + state.user.nombre + ' ' + state.user.apellido + ',\n\n'
+      + 'Ha completado satisfactoriamente la Fase Te\u00f3rica del Curso de Adaptaci\u00f3n al Bell Model 206B JetRanger III.\n\n'
+      + 'Licencia ANAC: ' + state.user.licencia + '\n'
+      + 'Resultado Examen Final: ' + score + '/30 (' + pct + '%)\n'
+      + 'Fecha: ' + new Date().toLocaleDateString(\'es-AR\',{day:\'2-digit\',month:\'long\',year:\'numeric\'}) + '\n\n'
+      + 'IMPORTANTE: Por favor adjunte el archivo PDF del certificado que se descarg\u00f3 autom\u00e1ticamente.\n\n'
+      + 'Eduardo J. Forgan\n'
+      + 'Instructor de Vuelo de Helic\u00f3pteros \u2014 Comandante\n'
+      + 'Modena Air Service \u2014 ANAC Argentina');
+    // Open email to student
+    window.open('mailto:' + state.user.email + '?subject=' + subj + '&body=' + body);
+    setTimeout(function(){
+      // CC to instructor
+      var bodyCC = encodeURIComponent('[COPIA] Cursante: ' + state.user.nombre + ' ' + state.user.apellido + '\nLicencia: ' + state.user.licencia + '\nEmail: ' + state.user.email + '\nResultado: ' + score + '/30 (' + pct + '%)\nFecha: ' + new Date().toLocaleDateString(\'es-AR\',{day:\'2-digit\',month:\'long\',year:\'numeric\'}));
+      window.open('mailto:eforgan@gruppomodena.com?subject=[COPIA] ' + subj + '&body=' + bodyCC);
+    }, 1000);
+    if(statusEl){
+      statusEl.className='email-status sending';
+      statusEl.innerHTML='\ud83d\udce7 Se abri\u00f3 el cliente de email. <strong>Adjunt\u00e1 el PDF descargado</strong> y hacerle click en Enviar. Para configurar env\u00edo autom\u00e1tico, configure EmailJS en el Panel Admin.';
+      statusEl.style.display='block';
+    }
     return;
   }
 
