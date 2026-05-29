@@ -1129,7 +1129,7 @@ async function sendCertificateEmails(doc, safeName, score, pct){
       + 'Ha completado satisfactoriamente la Fase Te\u00f3rica del Curso de Adaptaci\u00f3n al Bell Model 206B JetRanger III.\n\n'
       + 'Licencia ANAC: ' + state.user.licencia + '\n'
       + 'Resultado Examen Final: ' + score + '/30 (' + pct + '%)\n'
-      + 'Fecha: ' + new Date().toLocaleDateString(\'es-AR\',{day:\'2-digit\',month:\'long\',year:\'numeric\'}) + '\n\n'
+      + 'Fecha: ' + new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}) + '\n\n'
       + 'IMPORTANTE: Por favor adjunte el archivo PDF del certificado que se descarg\u00f3 autom\u00e1ticamente.\n\n'
       + 'Eduardo J. Forgan\n'
       + 'Instructor de Vuelo de Helic\u00f3pteros \u2014 Comandante\n'
@@ -1138,7 +1138,7 @@ async function sendCertificateEmails(doc, safeName, score, pct){
     window.open('mailto:' + state.user.email + '?subject=' + subj + '&body=' + body);
     setTimeout(function(){
       // CC to instructor
-      var bodyCC = encodeURIComponent('[COPIA] Cursante: ' + state.user.nombre + ' ' + state.user.apellido + '\nLicencia: ' + state.user.licencia + '\nEmail: ' + state.user.email + '\nResultado: ' + score + '/30 (' + pct + '%)\nFecha: ' + new Date().toLocaleDateString(\'es-AR\',{day:\'2-digit\',month:\'long\',year:\'numeric\'}));
+      var bodyCC = encodeURIComponent('[COPIA] Cursante: ' + state.user.nombre + ' ' + state.user.apellido + '\nLicencia: ' + state.user.licencia + '\nEmail: ' + state.user.email + '\nResultado: ' + score + '/30 (' + pct + '%)\nFecha: ' + new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}));
       window.open('mailto:eforgan@gruppomodena.com?subject=[COPIA] ' + subj + '&body=' + bodyCC);
     }, 1000);
     if(statusEl){
