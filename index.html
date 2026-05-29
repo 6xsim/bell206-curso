@@ -1186,20 +1186,20 @@ async function sendCertificateEmails(doc, safeName, score, pct){
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
-  const pdfBase64 = doc.output('datauristring');
+  // pdfBase64 generation removed (50KB limit)
   const nombre = `${state.user.nombre} ${state.user.apellido}`;
 
+  // NOTE: PDF adjunto removido (límite 50KB EmailJS free plan)
+  // El PDF se descarga automáticamente al dispositivo del cursante
   const templateParams = {
-    to_name:     nombre,
-    to_email:    state.user.email,
-    licencia:    state.user.licencia,
-    score:       `${score}/30 (${pct}%)`,
-    fecha:       dateStr,
-    aeronave:    'Bell Model 206B JetRanger III',
-    instructor:  'Eduardo J. Forgan',
-    cc_email:    EMAIL_CFG.ccEmail,
-    pdf_nombre:  `Certificado_Bell206B3_${safeName}.pdf`,
-    pdf_base64:  pdfBase64,
+    to_name:    nombre,
+    to_email:   state.user.email,
+    licencia:   state.user.licencia,
+    score:      `${score}/30 (${pct}%)`,
+    fecha:      dateStr,
+    aeronave:   'Bell Model 206B JetRanger III',
+    instructor: 'Eduardo J. Forgan',
+    cc_email:   EMAIL_CFG.ccEmail,
   };
 
   try{
@@ -1219,7 +1219,7 @@ async function sendCertificateEmails(doc, safeName, score, pct){
     });
 
     statusEl.className='email-status sent';
-    statusEl.innerHTML=`✅ Certificado enviado exitosamente a <strong>${state.user.email}</strong> y copia a <strong>${EMAIL_CFG.ccEmail}</strong>`;
+    statusEl.innerHTML=`✅ Email de aprobación enviado a <strong>${state.user.email}</strong> y copia a <strong>${EMAIL_CFG.ccEmail}</strong>. El certificado PDF fue descargado automáticamente a tu dispositivo.`;
   } catch(err){
     console.error('EmailJS error:', err);
     statusEl.className='email-status error';
