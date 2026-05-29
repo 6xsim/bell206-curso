@@ -110,14 +110,12 @@ const IMGS={
 
 // ========= EMAIL CONFIG =========
 const EMAIL_CFG = {
-  publicKey:  localStorage.getItem('ejsPK')  || '',
-  serviceId:  localStorage.getItem('ejsSVC') || '',
+  publicKey:  'NqfaIUeBLYgz5bkIs',
+  serviceId:  'service_ije28e8',
   templateId: localStorage.getItem('ejsTID') || '',
   ccEmail:    'eforgan@gruppomodena.com'
 };
-if(EMAIL_CFG.publicKey){
-  try{ emailjs.init({publicKey: EMAIL_CFG.publicKey}); }catch(e){}
-}
+try{ emailjs.init({publicKey: EMAIL_CFG.publicKey}); }catch(e){}
 
 // ========= COURSE DATA =========
 const MODULES = [
