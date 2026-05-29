@@ -664,6 +664,19 @@ function renderMap(){
   </div>`:`
   <div class="info-box" style="margin-top:8px"><p>Complete todos los módulos para acceder al Examen Final. Debe aprobar cada examen de módulo con mínimo 4/5 respuestas correctas para avanzar.</p></div>`}
   
+  \${(function(){
+    var correct=state.finalAnswers.filter(function(a,i){return a===FINAL_EXAM[i].ans;}).length;
+    var passed=state.finalReviewed&&correct>=21;
+    if(!passed) return "";
+    var pct=Math.round(correct/30*100);
+    return '<div style="background:linear-gradient(135deg,#1e3a1e,#0a2a0a);border:1.5px solid var(--green);border-radius:var(--radius2);padding:16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+      +'<div><div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.08em">Curso Aprobado</div>'
+      +'<div style="font-size:15px;font-weight:500;color:#fff;margin-top:2px">'+correct+'/30 ('+pct+'%) — ✅ FASE TEÓRICA COMPLETADA</div></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +'<button class="btn btn-green" onclick="goFinalResult()" style="font-size:13px;padding:8px 16px">🏆 Ver Resultado Final</button>'
+      +(state.user?'<button class="btn btn-primary" onclick="downloadCertNow()' + correct + ',' + pct + ')" style="font-size:13px;padding:8px 16px">📄 Descargar Certificado PDF</button>':'')
+      +'</div></div>';
+  })()\}
   <div style="margin-top:20px"><div class="tag" style="margin-bottom:8px">Herramientas de Cálculo</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><button class="btn" onclick="goWB()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">⚖️</span><span style="font-size:12px">Peso y Balanceo</span></button><button class="btn" onclick="goPerf()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📊</span><span style="font-size:12px">Performance</span></button><button class="btn" onclick="goHV()" style="padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:22px">📈</span><span style="font-size:12px">Diagrama H-V</span></button></div></div>
 `;
 }
@@ -921,6 +934,21 @@ function renderAdminKeys(){
   const tidVal = localStorage.getItem('ejsTID')||'';
   const configured = pkVal && svcVal && tidVal;
   let html=`
+  <div style="background:#1a1a0a;border:1px solid #4a3800;border-radius:var(--radius);padding:14px;margin-bottom:14px">
+    <div style="font-size:14px;font-weight:500;color:var(--amber2);margin-bottom:10px">📜 Generar Certificado Manual</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label style="font-size:12px">Nombre</label><input type="text" id="mc_nom" placeholder="Nombre" style="margin-bottom:0;font-size:13px"></div>
+      <div><label style="font-size:12px">Apellido</label><input type="text" id="mc_ape" placeholder="Apellido" style="margin-bottom:0;font-size:13px"></div>
+      <div><label style="font-size:12px">Nº Licencia ANAC</label><input type="text" id="mc_lic" placeholder="I.V.H. Lic. 12.345" style="margin-bottom:0;font-size:13px"></div>
+      <div><label style="font-size:12px">Email cursante</label><input type="email" id="mc_mail" placeholder="piloto@mail.com" style="margin-bottom:0;font-size:13px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label style="font-size:12px">Resultado (ej: 25/30 — 83%)</label><input type="text" id="mc_score" value="30/30 (100%)" style="margin-bottom:0;font-size:13px"></div>
+      <div><label style="font-size:12px">Fecha</label><input type="text" id="mc_fecha" value="${new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'})}" style="margin-bottom:0;font-size:13px"></div>
+    </div>
+    <button class="btn btn-primary" onclick="emitManualCert()" style="width:100%;margin-top:4px">📄 Generar y Enviar Certificado</button>
+    <div id="mc_status" style="font-size:12px;text-align:center;margin-top:6px;color:var(--text3)"></div>
+  </div>
   <div style="background:#0a1e10;border:1px solid #1a5a2a;border-radius:var(--radius);padding:14px;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-size:14px;font-weight:500;color:var(--green)">📧 Configuración EmailJS</div>
@@ -1197,6 +1225,33 @@ async function sendCertificateEmails(doc, safeName, score, pct){
 }
 
 // ========= EMAIL CONFIG SAVE =========
+window.emitManualCert = function(){
+  var nom=document.getElementById('mc_nom').value.trim();
+  var ape=document.getElementById('mc_ape').value.trim();
+  var lic=document.getElementById('mc_lic').value.trim();
+  var mail=document.getElementById('mc_mail').value.trim();
+  var score=document.getElementById('mc_score').value.trim();
+  var fecha=document.getElementById('mc_fecha').value.trim();
+  if(!nom||!ape||!lic||!mail){
+    document.getElementById('mc_status').innerHTML='<span style="color:var(--red)">Complete todos los campos.</span>';
+    return;
+  }
+  document.getElementById('mc_status').innerHTML='<span style="color:var(--amber)">Generando...</span>';
+  // Temporarily set user for cert generation
+  var prevUser=state.user;
+  state.user={nombre:nom,apellido:ape,licencia:lic,email:mail};
+  // Parse score
+  var parts=score.match(/(\d+)/);
+  var sc=parts?parseInt(parts[1]):30;
+  var pct=Math.round(sc/30*100);
+  try{
+    generateCertificate(sc,pct);
+    document.getElementById('mc_status').innerHTML='<span style="color:var(--green)">✅ Certificado generado y email enviado.</span>';
+  }catch(e){
+    document.getElementById('mc_status').innerHTML='<span style="color:var(--red)">❌ Error: '+e.message+'</span>';
+  }
+  state.user=prevUser;
+};
 window.saveEmailConfig = function(){
   const pk  = document.getElementById('ejs-pk').value.trim();
   const svc = document.getElementById('ejs-svc').value.trim();
@@ -1622,6 +1677,11 @@ function drawHV(spd,ht){
   if(ht>=0&&ht<=RhMax)plotPt(txR(Math.min(RsMax,spd)),tyR(ht),av);
 }
 
+window.goFinalResult=function(){state.view='finalResult';render();};
+window.downloadCertNow=function(score,pct){
+  if(!state.user){alert('Debés estar registrado para descargar el certificado.');return;}
+  generateCertificate(score,pct);
+};
 window.goWB=function(){state.view='wb_calc';render();setTimeout(function(){window.calcWB();},50);};
 window.goPerf=function(){state.view='perf_calc';render();setTimeout(function(){window.calcPerf();},50);};
 window.goHV=function(){state.view='hv_calc';render();setTimeout(function(){window.updHV();},50);};
