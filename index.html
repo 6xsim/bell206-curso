@@ -647,6 +647,7 @@ function renderMap(){
     </div>
   </div>
   <div class="progress-bar"><div class="progress-fill" style="width:${(state.completedModules.length/MODULES.length)*100}%"></div></div>
+  ${getCertBanner()}
   <div style="margin:16px 0">
   ${MODULES.map((m,i)=>{
     const done=state.completedModules.includes(i);
